@@ -1,0 +1,155 @@
+class FadeTextView extends TextView {  
+  
+    long delta=70l; //步进时间  
+    int width=0;    //字符串宽度  
+    int widthPixels=0;  //字符串的显示宽度  
+    int wp=4;   //字符串的显示宽度步进  
+  
+    public FadeTextView(Context context) {  
+        super(context);  
+        init();  
+    }  
+  
+    public FadeTextView(Context context, AttributeSet attrs) {  
+        super(context, attrs);  
+        TypedArray a=  
+            context.obtainStyledAttributes(  
+                attrs, R.styleable.FadeTextView);  
+        delta=(long) a.getInt(R.styleable.FadeTextView_fade_txt_delta, (int) delta);  
+        wp=a.getInt(R.styleable.FadeTextView_fade_txt_wp, wp);  
+        init();  
+    }  
+  
+    public FadeTextView(Context context, AttributeSet attrs, int defStyle) {  
+        super(context, attrs, defStyle);  
+        TypedArray a=  
+            context.obtainStyledAttributes(  
+                attrs, R.styleable.FadeTextView, defStyle, 0);  
+        delta=(long) a.getInt(R.styleable.FadeTextView_fade_txt_delta, (int) delta);  
+        wp=a.getInt(R.styleable.FadeTextView_fade_txt_wp, wp);  
+        init();  
+    }  
+//关于delta,wp这两个属性是在attrs.xml中配置的。动画显示的速度由这两个值控制，当然要加入时间的话，也是可以。以时间为第一选择，然后才是每次显示的宽度  
+    private void init() {  
+        setSingleLine(true);  
+        setHorizontalFadingEdgeEnabled(true);  //这两句才能显示出阴影效果。  
+        widthPixels=4;  
+        width=(int) getPaint().measureText(getText().toString());  
+        KeelLog.v("init.width:"+width+" getText().toString():"+getText().toString());  
+        postDelayed(mRunnable, delta);  
+    }  
+  
+    @Override  
+    public void setText(CharSequence text, BufferType type) {  
+        super.setText(text, type);  
+        init();  
+    }  
+//这个是最重要的方法，就是对TextView设置宽度，因为当一个TextView宽度不够显示出文本时，边缘会有阴影效果。当然还要设置单行的，否则是不行的。  
+    public void setWidthLength(int pixels) {  
+        setWidth(pixels);  
+    }  
+  
+    Runnable mRunnable=new Runnable() {  
+        @Override  
+        public void run() {  
+            //KeelLog.d("update:"+widthPixels+" width:"+width);  
+            if (width>0&&widthPixels<width) {  
+                widthPixels+=wp;  
+                setWidthLength(widthPixels);  
+                postInvalidate();  
+                postDelayed(mRunnable, delta);  
+            } else {  
+                //removeCallbacks(mRunnable);  
+            }  
+        }  
+    };  
+  
+}  
+attrs.xml  
+<declare-styleable name="FadeTextView">  
+        <attr name="fade_txt_delta" format="reference|integer"/>  
+        <attr name="fade_txt_wp" format="reference|integer"/>  
+    </declare-styleable>  
+  
+  
+如果使用xml，则不会产生阴影，而是... ，这可能要设置一些属性。  
+用java代码添加：  
+LinearLayout layout;//=new LinearLayout(this);  
+        layout=(LinearLayout) findViewById(R.id.layout);  
+        layout.setOrientation(LinearLayout.VERTICAL);  
+        layout.setBackgroundColor(R.color.holo_green_light);  
+        final FadeTextView textView=new FadeTextView(this);  
+        //textView.setWidthLength(8);  
+        LinearLayout.LayoutParams layoutParams=new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);  
+        //layoutParams.gravity=Gravity.CENTER;  
+        textView.setTextSize(28);  
+        textView.setText("互联网电视");  
+        layout.addView(textView, layoutParams);  
+就可以看效果了。  
+  
+View中的画阴影的代码：这段代码不起作用。就只能用上面的笨办法来淡入显示文本了。  
+int saveCount;  
+    int length=40;  //fade length  
+    float right;  
+    float top=0;  
+    float bottom;  
+    float fadingEdgeLength=25f;  
+    float rightFadeStrength=5f;  
+    public Paint paint;  
+    public Matrix matrix;  
+    public Shader shader;  
+  
+    private void drawTxt(Canvas canvas) {  
+        /*setFadingEdgeLength(length); 
+        setHorizontalFadingEdgeEnabled(true); 
+        setFadeColor(Color.GREEN);*/  
+        right=getRight();  
+        bottom=getBottom();  
+        fadingEdgeLength=getHeight();  
+        saveCount=canvas.getSaveCount();  
+  
+        int solidColor=getSolidColor();  
+        if (solidColor==0) {  
+            final int flags=Canvas.HAS_ALPHA_LAYER_SAVE_FLAG;  
+  
+            canvas.saveLayer(right-length, top, right, bottom, null, flags);  
+        } else {  
+            setFadeColor(solidColor);  
+        }  
+  
+        // Step 5, draw the fade effect and restore layers  
+        final Paint p=paint;  
+        final Matrix matrix=MyTextView.this.matrix;  
+        final Shader fade=shader;  
+        final float fadeHeight=fadingEdgeLength;  
+  
+        matrix.setScale(1, fadeHeight*rightFadeStrength);  
+        matrix.postRotate(90);  
+        matrix.postTranslate(right, top);  
+        fade.setLocalMatrix(matrix);  
+        canvas.drawRect(right-length, top, right, bottom, p);  
+  
+        KeelLog.d(VIEW_LOG_TAG, String.format("top:%f,right:%f,bottom:%f,(right-length):%f,fadingEdgeLength:%f", top, right, bottom, right-length, fadingEdgeLength));  
+  
+        canvas.restoreToCount(saveCount);  
+    }  
+private void init() {  
+        setText(subText);  
+        right=getRight();  
+        bottom=getBottom();  
+        paint=new Paint();  
+        matrix=new Matrix();  
+        // use use a height of 1, and then wack the matrix each time we  
+        // actually use it.  
+        shader=new LinearGradient(0, 0, 0, 1, 0xFF000000, 0, Shader.TileMode.CLAMP);  
+  
+        paint.setShader(shader);  
+        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_OUT));  
+    }  
+其中两个重点是：canvas.saveLayer(right-length, top, right, bottom, null, flags); 遮罩层。就是阴影部分。  
+  
+shader=new LinearGradient(0, 0, 0, 1, 0xFF000000, 0, Shader.TileMode.CLAMP);  
+        paint.setShader(shader);  
+        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_OUT));//填充方式，大概是中间空的，边缘较突出的  
+可是上面的代码画不出阴影。失望。  
+如果有同学用这段代码画出来了，希望回复。
